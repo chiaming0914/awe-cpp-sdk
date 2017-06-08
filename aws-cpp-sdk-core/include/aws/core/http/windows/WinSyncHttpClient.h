@@ -80,6 +80,7 @@ namespace Aws
              * config flag for whether or not to tell apis to allow redirects.
              */
             bool m_allowRedirects;
+            bool m_verifySSL;
         private:
 
             virtual void* OpenRequest(const Aws::Http::HttpRequest& request, void* connection, const Aws::StringStream& ss) const = 0;
