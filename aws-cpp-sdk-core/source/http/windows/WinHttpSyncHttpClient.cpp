@@ -50,6 +50,7 @@ WinHttpSyncHttpClient::WinHttpSyncHttpClient(const ClientConfiguration& config) 
     Aws::String strProxyHosts;
 
     m_allowRedirects = config.followRedirects;
+    m_verifySSL = config.verifySSL;
 
     bool isUsingProxy = !config.proxyHost.empty();
     //setup initial proxy config.
@@ -91,16 +92,7 @@ WinHttpSyncHttpClient::WinHttpSyncHttpClient(const ClientConfiguration& config) 
             AWS_LOGSTREAM_FATAL(GetLogTag(), "Failed setting password for proxy with error code: " << GetLastError());
     }
 
-    if (!config.verifySSL)
-    {
-        AWS_LOG_WARN(GetLogTag(), "Turning ssl unknown ca verification off.");
-        DWORD flags = SECURITY_FLAG_IGNORE_UNKNOWN_CA | SECURITY_FLAG_IGNORE_CERT_CN_INVALID;
-
-        if (!WinHttpSetOption(GetOpenHandle(), WINHTTP_OPTION_SECURITY_FLAGS, &flags, sizeof(flags)))
-            AWS_LOG_FATAL(GetLogTag(), "Failed to turn ssl cert ca verification off.");
-    }
-    else
-    {
+    if (m_verifySSL) {
         //disable insecure tls protocols, otherwise you might as well turn ssl verification off.
         DWORD flags = WINHTTP_FLAG_SECURE_PROTOCOL_TLS1 | WINHTTP_FLAG_SECURE_PROTOCOL_TLS1_1 | WINHTTP_FLAG_SECURE_PROTOCOL_TLS1_2;
         if (!WinHttpSetOption(GetOpenHandle(), WINHTTP_OPTION_SECURE_PROTOCOLS, &flags, sizeof(flags)))
@@ -141,6 +133,20 @@ void* WinHttpSyncHttpClient::OpenRequest(const Aws::Http::HttpRequest& request, 
         if (!WinHttpSetOption(hHttpRequest, WINHTTP_OPTION_DISABLE_FEATURE, &requestFlags, sizeof(requestFlags)))
             AWS_LOG_FATAL(GetLogTag(), "Failed to turn off redirects!");
     }
+
+    if (!m_verifySSL)
+    {
+        AWS_LOG_WARN(GetLogTag(), "Turning ssl unknown ca verification off.");
+        DWORD flags = SECURITY_FLAG_IGNORE_UNKNOWN_CA | SECURITY_FLAG_IGNORE_CERT_CN_INVALID;
+
+        if (!WinHttpSetOption(hHttpRequest, WINHTTP_OPTION_SECURITY_FLAGS, &flags, sizeof(flags)))
+            AWS_LOG_FATAL(GetLogTag(), "Failed to turn ssl cert ca verification off.");
+    }
+
+    requestFlags = WINHTTP_DECOMPRESSION_FLAG_ALL;
+    if (!WinHttpSetOption(hHttpRequest, WINHTTP_OPTION_DECOMPRESSION, &requestFlags, sizeof(requestFlags)))
+        AWS_LOG_FATAL(GetLogTag(), "Failed to turn on decompression!");
+
     return hHttpRequest;
 }
 
